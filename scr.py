@@ -58,11 +58,16 @@ class basicScObject(scBase):
 
 def data_filter(scobject, m):
     f1, f2 = m(scobject)
+    f1 = f1.getA1()
+    f2 = f2.getA1()
+    expression_matrix = scobject.expression_matrix[f1, :]
+    expression_matrix = expression_matrix[:, f2]
     scobject = basicScObject(
-        scobject.expression_matrix[f1, f2],
+        expression_matrix,
         scobject.gene_list[f1],
-        scobject.cell_list[f2]
-        scobject.labels[f2, :])
+        scobject.cell_list[f2],
+        scobject.labels[:, f2]
+        )
     return (scobject, f1, f2)
 
 

@@ -1,7 +1,6 @@
-import numpy as np
+import pandas as pd
 import seaborn as sns
-import matplotlib.pylab as plt
-
+sns.set()
 uniform_data = (index_cluster.index_expression * np.log2(10))[si, :]
-ax = sns.heatmap(uniform_data, yticklabels=False, cmap='bwr')
-plt.show()
+sns.clustermap(uniform_data, cmap="bwr", linewidths=0, figsize=(13, 13))
+sns.plt.show()

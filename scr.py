@@ -58,8 +58,8 @@ class basicScObject(scBase):
 
 def data_filter(scobject, m):
     f1, f2 = m(scobject)
-    f1 = f1.getA1()
-    f2 = f2.getA1()
+    f1 = np.copy(f1).flatten()
+    f2 = np.copy(f2).flatten()
     expression_matrix = scobject.expression_matrix[f1, :]
     expression_matrix = expression_matrix[:, f2]
     scobject = basicScObject(
@@ -108,4 +108,5 @@ class scmObject(basicScObject):
             if self.selected_genes is None:
                 self.selected_genes = self.select_genes()[0]
             selected_genes = self.selected_genes
+        selected_genes = np.copy(selected_genes).flatten()
         return self.expression_matrix[selected_genes, :]

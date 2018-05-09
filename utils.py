@@ -4,6 +4,51 @@ from sklearn import linear_model
 import modshogun
 
 
+def cor_ndarr0(xm, ym, m):
+    # 更加“友好”的版本
+
+    # 为了表现的一致性，np.copy是必要的？
+    ym = np.copy(ym)
+    xm = np.copy(xm)
+    xh, xw = xm.shape
+    yh, yw = ym.shape
+    pwr = np.zeros((xh, yh))
+    if xw != yw:
+        raise Exception("Data not Match")
+    for i in range(xh):
+        x_i = xm[i, :]
+        for j in range(yh):
+            y_i = ym[j, :]
+            cor = m(x_i, y_i)[0]
+            if np.isnan(cor):
+                pwr[i, j] = 0
+                raise Exception("get nan!")
+            else:
+                pwr[i, j] = cor
+    return pwr
+
+
+def cor_ndarr(xm, ym, m):
+    # 成对计算xm和ym中向量的相关性质.必须有相同的第二个维度
+    # m为接受两个向量返回一个"距离"的函数
+
+    # 为了表现的一致性，np.copy是必要的？
+    ym = np.copy(ym)
+    xm = np.copy(xm)
+
+    def alx(x):
+        def aly(y):
+            cor = m(x, y)[0]
+            if np.isnan(cor):
+                print("get nan!")
+                return 0
+            else:
+                return cor
+
+        return np.apply_along_axis(aly, 1, ym)
+    return np.apply_along_axis(alx, 1, xm)
+
+
 class lm(object):
     def __init__(self, x, y):
         from sklearn import linear_model
@@ -12,7 +57,7 @@ class lm(object):
         self.residuals = y - regr.predict(x)
 
     def get_residuals(self):
-        return self.residuals.getA1() 
+        return np.copy(self.residuals).flatten()
 
 
 class lm1(object):
@@ -58,11 +103,8 @@ def random(counts, n_features=500):
 def select_genes(counts, n_features=500, model=linear_model):
     (s_features, s_scores) = model(counts, n_features)
     # selected_data = counts[s_features, :]
-    return (s_features, s_scores)
+    return (s_features.flatten(), s_scores.flatten())
 
-
-##
-# 基因参考集合
 
 class KMeans(object):
     # test shogun kmean for cosine
@@ -81,15 +123,39 @@ class KMeans(object):
         discc = self.distance(kcc, features_train).get_distance_matrix()
         self.labels_ = np.copy(discc.argsort(axis=0)[0, :]).T
         return self
-        
+
     def fit_predict(self, x):
         features_train = modshogun.RealFeatures(x)
         kcc = RealFeatures(self.cluster_centers_)
         discc = self.distance(kcc, features_train).get_distance_matrix()
         return np.copy(discc.argsort(axis=0)[0, :]).T
-        
+
 
 class cosKMeans(KMeans):
     def __init__(self, k):
         self.k = k
         self.distance = modshogun.CosineDistance
+
+
+def get_CosineDistance(xm, ym):
+    # CosineDistance by shogun
+    xm = np.array(xm).T
+    ym = np.array(ym).T
+    fxm = modshogun.RealFeatures(xm)
+    fym = modshogun.RealFeatures(ym)
+    return modshogun.CosineDistance(fxm, fym).get_distance_matrix()
+
+
+def get_cosine_dot(xm, ym):
+    xm = np.array(xm)
+    ym = np.array(ym)
+
+    def cosr(x, y):
+        return(np.dot(x, y), 0)
+    return cor_ndarr(xm, ym, cosr)
+
+
+def check_nrom(x, axis):
+        sq_norm = np.sum(x**2, axis=axis)
+        print(sq_norm)
+        print(sq_norm.shape)

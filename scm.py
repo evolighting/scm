@@ -1,50 +1,11 @@
 import numpy as np
-from . import utils
+from .utils import cosKMeans, get_cosine_dot, cor_ndarr
 from .scr import indexGeneMapper, scBase, basicScObject, scmObject,\
     data_filter, basic_filter
-from sklearn.preprocessing import normalize
+from sklearn.preprocessing import normalize, Imputer
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.stats import spearmanr, pearsonr
 from sklearn.cluster import KMeans
-
-
-def cor_ndarr0(xm, ym, m):
-    # 更加“友好”的版本
-
-    # 为了表现的一致性，np.copy是必要的？
-    ym = np.copy(ym)
-    xm = np.copy(xm)
-    xh, xw = xm.shape
-    yh, yw = ym.shape
-    pwr = np.zeros((xh, yh))
-    if xw != yw:
-        raise Exception("Data not Match")
-    for i in range(xh):
-        x_i = xm[i, :]
-        for j in range(yh):
-            y_i = ym[j, :]
-            cor = m(x_i, y_i)[0]
-            if np.isnan(cor):
-                pwr[i, j] = 0
-                raise Exception("get nan!")
-            else:
-                pwr[i, j] = cor
-    return pwr
-
-
-def cor_ndarr(xm, ym, m):
-    # 成对计算xm和ym中向量的相关性质.必须有相同的第二个维度
-    # m为接受两个向量返回一个"距离"的函数
-
-    # 为了表现的一致性，np.copy是必要的？
-    ym = np.copy(ym)
-    xm = np.copy(xm)
-
-    def alx(x):
-        def aly(y):
-            return m(x, y)[0]
-        return np.apply_along_axis(aly, 1, ym)
-    return np.apply_along_axis(alx, 1, xm)
 
 
 class indexCluster(scBase):
@@ -164,7 +125,7 @@ class indexCell(scBase):
             x_i = s_expression[chunks_i[i]:chunks_i[1+i], :].T
             try:
                 # 前后距离度量要统一，都是使用cos
-                kmeans = utils.cosKMeans(k).fit(x_i)
+                kmeans = cosKMeans(k).fit(x_i)
                 # 一些确认性的工作,比如聚类是否成功
             except Exception as e:
                 raise e
@@ -173,9 +134,9 @@ class indexCell(scBase):
 
             self.predict_cluster[chunks_i[i]:chunks_i[1+i], :] = \
                 kmeans.labels_.T
-
+            # normalize各分块内部
             self.cluster_centers[chunks_i[i]:chunks_i[1+i], :] = \
-                kmeans.cluster_centers_.T
+                normalize(kmeans.cluster_centers_, axis=1).T
         self.chunks_i = np.array(chunks_i, dtype='int')
         self.labels = scmObject.labels
 
@@ -186,7 +147,7 @@ class scmapCell(object):
         cf = np.intersect1d(np.unique(p_scObject.gene_list), s_genes)
         cf_pi = p_scObject.gene_to_index(cf)
         p_expression = p_scObject.expression_matrix[cf_pi, :]
-        p_expression = normalize(p_expression, axis=0)
+        # p_expression = normalize(p_expression, axis=0)
         cf_ii = index.gene_to_index(cf)
         self.index_cluster = index.predict_cluster
         self.index_cell_list = index.cell_list
@@ -195,7 +156,7 @@ class scmapCell(object):
         # 然后搜索最近邻的点
 
         # 对每个cell需要求范数，归一化,这里是算个平方和
-        # sq_norm = np.sum(p_expression**2, axis=0)
+        sq_norm = np.sum(np.array(p_expression)**2, axis=0)
 
         dist_to_index = np.zeros((index.M, index.k, p_scObject.cell_num))
         split = 0
@@ -207,14 +168,20 @@ class scmapCell(object):
                 # 大概应该记录并丢弃
                 raise Exception("No commom genes in chunk")
             xi_cluster_centers = index.cluster_centers[c_mask, :].T
+            xi_cluster_centers = normalize(xi_cluster_centers, axis=1)
             xp_expression = p_expression[split: split + len(c_mask)].T
+            xp_expression = normalize(xp_expression, axis=1)
             # pair wise 计算xi，和xp之间的距离
-            dist_to_index[i, :, :] = cosine_similarity(
-                xi_cluster_centers, xp_expression)
+            # dist_to_index[i, :, :] = cosine_similarity(
+            #     xi_cluster_centers, xi_cluster_centers)
+            dist_to_index[i, :, :] = \
+                get_cosine_dot(xi_cluster_centers, xp_expression)
         # 于是你得到了 c * r 的矩阵对应c到r个点的投影距离
         self.p_to_i_d = np.zeros((p_scObject.cell_num, len(index.cell_list)))
         for i in range(p_scObject.cell_num):
-            self.p_to_i_d[i, :] = self._get_dist(dist_to_index[:, :, i])
+            self.p_to_i_d[i, :] = \
+                self._get_dist(dist_to_index[:, :, i]) / \
+                np.sqrt(sq_norm[i] * index.M)
         # c * r 的index矩阵，对应r的排序index
         self.sort_di = np.apply_along_axis(np.argsort, 1, self.p_to_i_d)
 

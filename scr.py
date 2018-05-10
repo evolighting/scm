@@ -105,7 +105,9 @@ class scmObject(basicScObject):
 
     def get_selected_expression(self, selected_genes=None):
         if selected_genes is None:
+            print("Not Specific Genes")
             if self.selected_genes is None:
+                print("Using Generated Genes")
                 self.selected_genes = self.select_genes()[0]
             selected_genes = self.selected_genes
         selected_genes = np.copy(selected_genes).flatten()

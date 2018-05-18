@@ -115,7 +115,7 @@ class pqIndex(object):
         return (di[:, :k], cosm[np.arange(h)[:, np.newaxis], di[:, :k]])
 
     def get_knn_filtered(self, x, filter, k=3):
-        # incase of missing ,should add 0 to input
+        # in case of missing ,should add 0 to input
         h, w = x.shape
         x_e = np.zeros((h, self.f))
         x_e[:, filter] = x
@@ -178,3 +178,80 @@ class pqIndex_Euc(object):
         x_e = np.zeros((h, self.f))
         x_e[:, filter] = x
         return self.get_knn(x_e, k=3)
+
+
+class pqIndex_supervised(object):
+    def __init__(self, x, y, m=None, k=None):
+        """
+        more compact version, with "p2 distance"
+        x: n * f data
+        y: labels for x
+        n: sample number
+        f: feature number
+        """
+        self.metrics = "Euc"
+        self.m, self.k = m, k
+        self.n, self.f = x.shape
+        if self.m is None:
+            self.m = min(np.int(np.ceil(self.f / 10)), 100)
+        if self.k is None:
+            self.k = max(np.int(np.sqrt(self.n)), 2)
+        # split feature space
+        chunks_i = [int(i * self.f / (self.m)) for i in range(self.m + 1)]
+        self.ci_list = \
+            [np.arange(chunks_i[i], chunks_i[i + 1]) for i in range(self.m)]
+        self.predict_labels = np.zeros((self.m, self.n), dtype='int')\
+
+        # kmean group by labels
+        ck = self.n / self.k
+
+        def split_by_labels(y, label):
+            label_i = y == label
+            label_num = label_i.sum()
+            # k_i 中，每个组最小分组值也许会有影响
+            k_i = max(np.int(label_num / ck), 1)
+            return(label_i, k_i)
+
+        label_i_list = [split_by_labels(y, i) for i in np.unique(y)]
+        self.k = np.sum([i[1] for i in label_i_list])
+        self.cluster_centers = np.zeros((self.f, self.k))
+
+        for i in range(self.m):
+            x_i = x[:, self.ci_list[i]]
+
+            cluster_centers_i = np.zeros((len(self.ci_list[i]), self.k))     
+
+            pl = 0
+            for j, k in label_i_list:
+                km = KMeans(n_clusters=k)
+                x_ij = x_i[j, :]
+                km.fit(x_ij)
+                self.predict_labels[i, j] = km.labels_ + pl
+                cluster_centers_i[:, np.arange(pl, pl + k)] = \
+                    km.cluster_centers_.T
+                pl += k
+            self.cluster_centers[self.ci_list[i], :] = cluster_centers_i
+        if self.k != pl:
+            raise Exception("kmean error")
+        print(self.cluster_centers.shape)
+
+    def get_knn(self, x, k=3):
+        h, w = x.shape
+        if k > self.n or w > self.f:
+            raise Exception("Invalid input")
+        cosm = np.zeros((h, self.n))
+        dist = np.zeros((self.m, h, self.k))
+
+        for mi in range(self.m):
+            qx_i = x[:, self.ci_list[mi]]
+            cc_i = self.cluster_centers[self.ci_list[mi], :].T 
+            pl_i = self.predict_labels[mi]
+            d_v = euclidean_distances(qx_i, cc_i)
+            dist[mi, :, :] = d_v**2
+        for ni in range(self.m):
+            k_i = self.predict_labels[ni, :]
+            cosm += dist[ni, :, :][:, k_i]
+        cosm = np.sqrt(cosm)
+
+        di = cosm.argsort()
+        return (di[:, :k], cosm[np.arange(h)[:, np.newaxis], di[:, :k]])

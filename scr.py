@@ -92,8 +92,8 @@ class scmObject(basicScObject):
         self.selected_genes = None
 
     def set_selected_genes(self, s_genes):
-        # 有兴趣可以加一些验证
-        self.selected_genes = None
+        # 可以加一些验证
+        self.selected_genes = s_genes
 
     def get_selected_genes(self):
         if self.selected_genes is None:

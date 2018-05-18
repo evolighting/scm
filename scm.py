@@ -194,3 +194,4 @@ class indexCell_Euc(scBase):
                 return -1
 
         return np.apply_along_axis(assign_labels, 1, knn_l)
+

@@ -2,6 +2,7 @@ import numpy as np
 from scipy import stats
 from sklearn import linear_model
 import modshogun
+from sklearn.model_selection import train_test_split
 
 
 def cor_ndarr0(xm, ym, m):
@@ -146,16 +147,22 @@ def get_CosineDistance(xm, ym):
     return modshogun.CosineDistance(fxm, fym).get_distance_matrix()
 
 
-def get_cosine_dot(xm, ym):
-    xm = np.array(xm)
-    ym = np.array(ym)
-
-    def cosr(x, y):
-        return(np.dot(x, y), 0)
-    return cor_ndarr(xm, ym, cosr)
-
-
 def check_nrom(x, axis):
-        sq_norm = np.sum(x**2, axis=axis)
-        print(sq_norm)
-        print(sq_norm.shape)
+    # get l2 norm info
+    sq_norm = np.sum(x**2, axis=axis)
+    print(sq_norm)
+    print(sq_norm.shape)
+
+
+def tts_data(sco):
+    # train_test_split
+    xi = np.arange(sco.cell_num)
+    y = sco.labels[0]
+    i_train, i_test, y_train, y_test = train_test_split(xi, y, test_size=0.33)
+    bs_train = scm.basicScObject(
+        sco.expression_matrix[:, i_train], sco.gene_list,
+        sco.cell_list[i_train], sco.labels[:, i_train])
+    bs_test = scm.basicScObject(
+        sco.expression_matrix[:, i_test], sco.gene_list,
+        sco.cell_list[i_test], sco.labels[:, i_test])
+    return (bs_train, bs_test)

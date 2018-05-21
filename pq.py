@@ -219,7 +219,7 @@ class pqIndex_supervised(object):
         for i in range(self.m):
             x_i = x[:, self.ci_list[i]]
 
-            cluster_centers_i = np.zeros((len(self.ci_list[i]), self.k))     
+            cluster_centers_i = np.zeros((len(self.ci_list[i]), self.k))
 
             pl = 0
             for j, k in label_i_list:
@@ -244,7 +244,7 @@ class pqIndex_supervised(object):
 
         for mi in range(self.m):
             qx_i = x[:, self.ci_list[mi]]
-            cc_i = self.cluster_centers[self.ci_list[mi], :].T 
+            cc_i = self.cluster_centers[self.ci_list[mi], :].T
             pl_i = self.predict_labels[mi]
             d_v = euclidean_distances(qx_i, cc_i)
             dist[mi, :, :] = d_v**2
